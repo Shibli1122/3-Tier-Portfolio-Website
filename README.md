@@ -1,181 +1,237 @@
-## STEP 1 — Clone the Repository
+# Portfolio Website — Run Guide
 
-Clone the project from GitHub:
+Commands to set up and run the project on an Ubuntu server (e.g. EC2), with a one-liner explaining each command.
 
-```bash
-git clone https://github.com/Shibli1122/Portfolio-Website.git
-cd Portfolio-Website
-```
-
----
-
-## STEP 2 — Update Your System
-
-Update Ubuntu packages:
+## Step 1 — Arrange files into proper folders
 
 ```bash
-sudo apt update
-sudo apt upgrade -y
+mkdir -p backend database frontend
 ```
+Creates the three folders the code expects (backend, database, frontend).
 
----
+```bash
+mv backend_server.js backend/server.js
+```
+Moves the backend script into `backend/` and renames it to `server.js`.
 
-## STEP 3 — Install Node.js
+```bash
+mv backend_package.json backend/package.json
+```
+Moves the backend's dependency file into `backend/` as `package.json`.
 
-Install Node.js 20 LTS:
+```bash
+mv database_service.py database/db_service.py
+```
+Moves the DB script into `database/` and renames it to `db_service.py` (backend imports it by this name).
+
+```bash
+mv portfolio_frontend.html frontend/index.html
+```
+Moves the frontend HTML into `frontend/` as `index.html`.
+
+## Step 2 — Update system & install Node.js
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+Refreshes package lists and upgrades installed packages.
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# Verify installation
-node -v
-npm -v
 ```
+Adds the NodeSource repository for Node.js 20.
 
----
+```bash
+sudo apt install -y nodejs
+```
+Installs Node.js (and npm) from that repository.
 
-## STEP 4 — Install Python
+```bash
+node -v && npm -v
+```
+Confirms Node.js and npm installed correctly.
 
-Install Python, pip and virtual environment:
+## Step 3 — Install Python
 
 ```bash
 sudo apt install -y python3 python3-pip python3-venv
-
-# Verify installation
-python3 --version
-pip3 --version
 ```
+Installs Python 3, pip, and the venv module for virtual environments.
 
----
-
-## STEP 5 — Install PostgreSQL
-
-Install PostgreSQL server:
+## Step 4 — Install & start PostgreSQL
 
 ```bash
 sudo apt install -y postgresql postgresql-contrib
-
-sudo systemctl enable postgresql
-sudo systemctl start postgresql
-
-sudo systemctl status postgresql
 ```
+Installs the PostgreSQL database server.
 
----
+```bash
+sudo systemctl enable postgresql
+```
+Sets PostgreSQL to start automatically on boot.
 
-## STEP 6 — Create Database
+```bash
+sudo systemctl start postgresql
+```
+Starts the PostgreSQL service now.
 
-Open PostgreSQL:
+## Step 5 — Create database & user
 
 ```bash
 sudo -u postgres psql
 ```
-
-Run:
+Opens a PostgreSQL prompt as the default `postgres` superuser.
 
 ```sql
 CREATE USER portfolio_user WITH PASSWORD 'portfolio_pass';
+```
+Creates the database user the app connects with.
 
+```sql
 CREATE DATABASE portfolio_db;
+```
+Creates the database used by the app.
 
+```sql
 GRANT ALL PRIVILEGES ON DATABASE portfolio_db TO portfolio_user;
+```
+Gives that user full rights on the database.
 
+```sql
 \c portfolio_db
+```
+Switches the psql session into the new database.
 
+```sql
 GRANT ALL ON SCHEMA public TO portfolio_user;
-GRANT CREATE ON SCHEMA public TO portfolio_user;
-ALTER SCHEMA public OWNER TO portfolio_user;
-ALTER DATABASE portfolio_db OWNER TO portfolio_user;
+```
+Grants the user full rights on the `public` schema.
 
+```sql
+GRANT CREATE ON SCHEMA public TO portfolio_user;
+```
+Allows the user to create new tables in that schema.
+
+```sql
+ALTER SCHEMA public OWNER TO portfolio_user;
+```
+Makes the user the owner of the `public` schema.
+
+```sql
+ALTER DATABASE portfolio_db OWNER TO portfolio_user;
+```
+Makes the user the owner of the database itself.
+
+```sql
 \q
 ```
+Exits the psql prompt.
 
----
-
-## STEP 7 — Create Python Virtual Environment
+## Step 6 — Python virtual environment
 
 ```bash
 python3 -m venv venv
+```
+Creates an isolated Python environment in a `venv/` folder.
 
+```bash
 source venv/bin/activate
 ```
-
----
-
-## STEP 8 — Install Python Dependencies
+Activates that virtual environment for the current shell.
 
 ```bash
 pip install psycopg2-binary
 ```
+Installs the PostgreSQL driver Python needs to connect to the DB.
 
----
-
-## STEP 9 — Install Backend Dependencies
-
-```bash
-cd backend
-
-npm install
-
-cd ..
-```
-
----
-
-## STEP 10 — Initialize Database
+## Step 7 — Initialize the database
 
 ```bash
-source venv/bin/activate
-
 cd database
+```
+Moves into the database folder.
 
+```bash
 python db_service.py
+```
+Runs the script once to create tables and seed sample data.
 
+```bash
 cd ..
 ```
+Returns to the project root.
 
----
-
-## STEP 11 — Start Backend
+## Step 8 — Install backend dependencies
 
 ```bash
 cd backend
-
-node server.js
 ```
+Moves into the backend folder.
 
-Open another terminal:
+```bash
+npm install
+```
+Installs the Node.js packages (Express, cors, etc.) listed in `package.json`.
+
+## Step 9 — Free up ports before starting (if reused)
+
+```bash
+sudo lsof -i :5000
+```
+Shows which process (if any) is currently using port 5000 (backend).
+
+```bash
+sudo lsof -i :3000
+```
+Shows which process (if any) is currently using port 3000 (frontend).
+
+```bash
+sudo kill -9 <PID>
+```
+Force-kills a specific process by its PID shown above.
+
+```bash
+pkill -f "node server.js"
+```
+Kills any running backend `node server.js` process by name.
+
+```bash
+pkill -f "http-server"
+```
+Kills any running `http-server` (frontend) process by name.
+
+## Step 10 — Start backend (in background)
+
+```bash
+cd ~/Portfolio-Website/backend
+```
+Moves into the backend folder from anywhere.
+
+```bash
+nohup node server.js > backend.log 2>&1 &
+```
+Starts the backend in the background, logging output to `backend.log`, so it keeps running after the terminal closes.
 
 ```bash
 curl http://localhost:5000/api/health
 ```
+Checks that the backend is responding.
 
----
-
-## STEP 12 — Start Frontend
+## Step 11 — Start frontend (in background)
 
 ```bash
-cd frontend
-
-npx http-server -p 3000
+cd ~/Portfolio-Website/frontend
 ```
+Moves into the frontend folder.
 
----
-
-## STEP 13 — Configure AWS Security Group
-
-Open the following inbound ports:
-
+```bash
+nohup npx http-server -p 3000 -a 0.0.0.0 > frontend.log 2>&1 &
 ```
-3000
-5000
-```
+Serves the frontend on port 3000, bound to all network interfaces (not just localhost) so it's reachable externally, running in the background.
 
----
-
-## STEP 14 — Open the Website
-
+```bash
+curl http://localhost:3000
 ```
-http://<EC2-PUBLIC-IP>:3000
-```
+Checks that the frontend is responding locally.
+
+## Step 12 — Open in browser
